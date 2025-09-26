@@ -1,3 +1,3 @@
 This book has been published to provide a guideline for installing the ELK stack. Since it's deprecated, you can download the latest Self-Managed Elastic packages for Cloud VM/Private Clouds and modify the installation method based on the installed OS's current requirements, including enhanced security policies, or follow the Elastic Cloud Serverless/Managed installation instructions as shown on the Elastic Docs.
 
-NB : "ELK--CentOS-Ubuntu.docx", with size of 4,085,017 kb (kilobytes), and file hash using the hashing algorithm SHA-512 has the value : 7e125f3b8aa199546bcaa12999aa37a0b320ddabd5531a1abeca57e6123a019e69091b454e30f019c97faae675608a44014cebc79a4030a9bcf9bc0176a2d349.
+NB : "ELK--CentOS-Ubuntu.pdf", with size of 3,818,451 kb (kilobytes), and file hash using the hashing algorithm SHA-512 has the value : 5029d14735fa4f00b459d60d6b04c66a2e05ec84681bd2e8147398af910ae11d5276cb06cae7b5937b9c0cca8bb8d99ed0655087c1bfdc31aca344f5c43e4d22.
