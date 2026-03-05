@@ -19,7 +19,7 @@ Switch1(config)# interface range fastEthernet 0/12-16
 Switch1(config-if-range)# description CTRLSERVERS
 Switch1(config-if-range)# switchport mode access 
 Switch1(config-if-range)# switchport access vlan 16
-Switch1(config-if-range)# end
+Switch1(config-if-range)# exit
 
 Switch1(config)# interface fastEthernet 0/7
 Switch1(config-if)# description TRUNK-ROUTER
