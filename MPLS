@@ -1,4 +1,5 @@
 MPLS is a forwarding mechanism - a method of moving packets through a network using labels instead of IP addresses.
+CEF = the router pre-builds a lookup table and stores it in hardware. Every packet that arrives, the router looks up the routing table, figures out where to send it (processes it in software).
 
 Configuring the Multi Protocol Label Switching (MPLS) on a router (which is configured on the routers inside the ISP's network):
 
