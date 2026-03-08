@@ -27,7 +27,7 @@ Switch1(config-if)# switchport mode trunk
 Switch1(config-if)# exit
         
 ---------------------------------------------------------
-Configuring the router (assuming 10.0.0.1 is the gateway's address):
+Configuring the router (assuming 10.0.0.1 is the gateway's address for each vlan):
 
 Router1(config)# interface gigabitEthernet 0/0.15
 Router1(config-subif)# encapsulation dot1Q 15
