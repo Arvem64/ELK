@@ -1,0 +1,43 @@
+Configure Authentication and TLS on Elastic Server:
+
+Update /etc/elasticsearch/elasticsearch.yml
+xpack.security.enabled: true 
+xpack.security.transport.ssl.enabled: true
+systemctl restart elasticsearch
+
+Set Built-in Users Password
+
+Go to this path /usr/share/elasticsearch/bin
+Run the command ./elasticsearch-setup-passwords interactive
+
+************************************
+Configure Logstash Authentication
+
+Update /etc/logstash/conf.d/logstash.conf
+Add 2 lines on the Elasticsearch's Output plugging:
+user =>'elastic'
+password =>'password'
+systemctl restart logstash
+
+*use the password you keyed-in in the previous steps
+
+***********************************
+Configure Filebeat Authentication
+
+Update /etc/filebeat/filebeat.yml
+Uncomment the username and password, and update the password value on the Authentication credentials
+systemctl restart filebeat
+*use the password you keyed-in in the previous steps
+
+***************************************
+Configure Kibana Authentication
+
+Update /etc/kibana/kibana.yml
+elasticsearch.username: “kibana_system”
+elasticsearch.password: “password”
+systemctl restart kibana
+
+----------------------------
+Further details:
+https://www.elastic.co/guide/en/logstash/8.19/ls-security.html#ls-http-auth-basic
+https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/kibana-authentication#basic-authentication
