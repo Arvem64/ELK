@@ -13,7 +13,7 @@ Run the command ./elasticsearch-setup-passwords interactive
 ************************************
 Configure Logstash Authentication
 
-Update the logstash's configuaration file /etc/logstash/conf.d/logstash.conf
+Update the logstash's configuration file /etc/logstash/conf.d/logstash.conf
 Add 2 lines on the Elasticsearch's Output plugging:
 user =>'elastic'
 password =>'password'
