@@ -40,7 +40,7 @@ systemctl restart kibana
 -----------------------------------------------------------------
 other method:
 -----------------------------------------------------------------------
-The role API to create a logstash_writer role:
+On the role API, create a logstash_writer role:
 
 POST _security/role/logstash_writer
 {
