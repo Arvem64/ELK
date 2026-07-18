@@ -13,13 +13,14 @@ Run the command ./elasticsearch-setup-passwords interactive
 ************************************
 Configure Logstash Authentication
 
-Update /etc/logstash/conf.d/logstash.conf
+Update the logstash's configuaration file /etc/logstash/conf.d/logstash.conf
 Add 2 lines on the Elasticsearch's Output plugging:
 user =>'elastic'
 password =>'password'
 systemctl restart logstash
 
 *use the password you keyed-in in the previous steps
+*in our case is cfglog.conf as mentionned in the handbook
 
 ***********************************
 Configure Filebeat Authentication
