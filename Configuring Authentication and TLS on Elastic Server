@@ -20,7 +20,7 @@ password =>'password'
 systemctl restart logstash
 
 *use the password you keyed-in in the previous steps
-*in our case is cfglog.conf as mentionned in the handbook
+*in our case is cfglog.conf as mentioned in the handbook
 
 ***********************************
 Configure Filebeat Authentication
