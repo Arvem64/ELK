@@ -53,6 +53,9 @@ POST _security/role/logstash_writer
     }
   ]
 }
+
+*in our case, we have 2 indices logstash-* and zabbix-*, so we modify this line :
+"names": [ "logstash-*" , "zabbix-*" ], 
 -----------------------------------------------------------------------
 Create a logstash_internal user and assign it the logstash_writer role:
 
