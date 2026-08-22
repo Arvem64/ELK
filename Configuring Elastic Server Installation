@@ -1,0 +1,287 @@
+Update ELK Installation and configuring Authentication/TLS on Elastic Server:
+
+--------------------------------------------
+Update /etc/elasticsearch/elasticsearch.yml
+
+cluster.name: elasticsrch-cluster
+node.name: node-1 #(it does not necessarily have to match the hostname)
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+
+network.host: 127.0.0.1 (default address) #(for example, in case of LAN, set to the server's private IP@ = 10.0.0.11, or to 0.0.0.0= listen on all available network interfaces)
+http.port: 9200
+
+discovery.type: single-node #(in case of 1 node in the cluster)
+
+xpack.security.enabled: true 
+xpack.security.http.ssl.enabled: true #(to encrypt the traffic between the clients (logstash-kibana-curl) and Elasticsearch, it means Elasticsearch's REST API uses HTTPS instead of plain HTTP, it will be https://SERVER-IP@:9200) 
+xpack.security.transport.ssl.enabled: true #(to encrypt the elasticsearch node-to-node communication)
+xpack.security.transport.ssl.verification_mode: certificate
+
+************************************************************
+In case of multiple nodes, for load balancing and redundancy purposes (for example, 3 nodes 10.0.0.11, 10.0.0.12, 10.0.0.13 // subnet mask 255.255.255.0 -- The decimal equivalent /24):
+
+We do not need discovery.type, instead the nodes discover each other using discovery.seed_hosts:
+
+cluster.name: elasticsrch-cluster
+node.name: node-1 #(change it to node-2 / node-3 on other servers)
+
+network.host: 0.0.0.0 (a routable IP@ 0.0.0.0)
+http.port: 9200
+transport.port: 9300 #(default port, for communication between nodes)
+
+cluster.initial_master_nodes: #(bootstrap --start-- the cluster using an initial set of master-eligible nodes, it means which nodes participate in creating the new cluster)
+- node-1
+- node-2
+- node-3
+
+#!Important: after the cluster successfully formed for the first time, remove cluster.initial_master_nodes from the configuration. This setting is only meant for the very first bootstrap. For the regular restarts, rolling updates or adding new nodes, leave it removed. With this misconfiguration, it may cause a Split-brain at the cluster management level. Once this occurs, data loss happens in two ways:: Divergent Data: some clients will write data to "Cluster A" and others to "Cluster B" // Overwritten Cluster State: bootstrapping a new cluster and pointing to an existing data path, it can overwrite the cluster metadata on disk. The original indices and data mapping become invisible to Elasticsearch, rendering the existing data unrecoverable.
+
+discovery.seed_hosts: #(a string containing the addresses separated by commas, the default value for discovery.seed_hosts is ["127.0.0.1", "[::1]"])
+- 10.0.0.11
+- 10.0.0.12
+- 10.0.0.13
+
+*********************************************
+Set Built-in Users Password:
+cd /usr/share/elasticsearch/bin
+./elasticsearch-reset-password -u elastic -i
+
+#for the user= elastic
+--------------------------------------------------------------------------------------
+#!Deprecated: /usr/share/elasticsearch/bin/elasticsearch-setup-passwords interactive
+--------------------------------------------------------------------------------------
+systemctl restart elasticsearch
+
+***********************************************************************
+Configure Logstash Authentication
+
+Update the logstash's configuration file /etc/logstash/conf.d/logstash.conf
+
+Add 2 lines on the Elasticsearch's Output plugging:
+user =>'elastic'
+password =>'password'
+systemctl restart logstash
+
+#use the password you keyed-in in the previous steps
+#in our case is cfglog.conf as mentioned in the handbook
+
+*********************************************************
+Configure Filebeat Authentication
+
+Update /etc/filebeat/filebeat.yml
+
+#since - type: log is deprecated, we now use Filestream input block instead:
+---------------------------------------------
+filebeat.inputs:
+
+- type: filestream
+  id: messages-log
+enabled : true
+paths:
+- /var/log/messages
+tags: ["Messages-logs"]
+
+- type: filestream
+enabled : true
+id: secure-log
+paths:
+- /var/log/secure
+tags: ["Secure-logs"]
+
+- type: filestream
+enabled : true
+id: suricata-log
+paths:
+- /var/log/suricata/eve.json
+tags: ["Suricata-logs"]
+
+ ### Parsers configuration
+  #### JSON configuration
+
+  parsers:
+     ndjson:
+     keys_under_root: true # the keys (decoded JSON fields of the log line) are copied to the top level of the output document alongside message and @timestamp instead of these fields get nested inside a json object, when parsing.
+     add_error_key: true # if JSON parsing encounters an error, Filebeat adds an error.message field to the event instead of silently dropping/pasing the raw line -- critical for catching malformed log lines.
+
+--------------------------------------------------------------------------------------------------------------------------------------
+#if you are still using the old configuration, you should allow deprecated use until jumping to 9.x at which point it will be fully removed:
+
+filebeat.inputs:
+- type: log
+enabled : true
+#to be abe to still use type log:
+allow_deprecated_use: true
+paths:
+- /var/log/messages
+tags: ["Messages-logs"]
+- type: log
+paths:
+- /var/log/secure
+tags: ["Secure-logs"]
+- type: log
+paths:
+- /var/log/suricata/eve.json
+tags: ["Suricata-logs"]
+
+***********************************
+output.logstash:
+# The Logstash hosts
+hosts: ["elk-srv:5044"]
+
+#in case of one way TLS (a self-signed certificate issued by Elastic Server, which acts as a certificate authority (CA)). Keep this certificate in which the Issuer and SubjectName "/CN" are indentical-namely, "elk-srv":
+#ssl.certificate_authorities: ["/etc/pki/tls/certs/logstash-forwarder.crt"]
+====================================================================================
+------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------
+#in case of configuring filebeat to send data straight to elasticsearch, bypassing logstash:
+
+output.elasticsearch:
+      hosts: ["localhost:9200"]
+      protocol: "https"
+      #Authentication credentials
+      username: "elastic"
+      password: "elasticpsswrd"
+
+systemctl restart filebeat
+#use the password you keyed-in in the previous steps
+
+*************************************************************************************
+Configure Kibana Authentication
+
+Update /etc/kibana/kibana.yml
+
+server.port: 5601
+server.host: "localhost" #(LAN IP@ or 0.0.0.0)
+elasticsearch.hosts: ["https://localhost:9200"]
+server.name: "kibana"
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "password"
+
+#Elasticsearch's automatic security setup generates the HTTP CA when it starts for the first time, so copy it to the kibana's certs folder: sudo cp /etc/elasticsearch/certs/http_ca.crt /etc/kibana/certs/
+elasticsearch.ssl_certificateAuthorities: ["/etc/kibana/certs/http_ca.crt"]
+
+logging.root.level: info #(which type of logs to display. Minimum log level. One of debug, info, warning, or error. The default log level is info)
+
+systemctl restart kibana
+
+#Otherwise, run /usr/share/elasticsearch/bin/elasticsearch-certutil http
+#be sure you select N to "Generate a CSR" (Certificate signing request to be sent to a trusted external or internal CA for signing) to generate a CRT instead, and Y to "using an existing CA" if you already created a CA for your cluster, when prompting
+#it's recommanded by Elastic to use the existing HTTP_CA certificate
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+other method:
+-----------------------------------------------------------------------
+On the role API feature, create a logstash_writer role (or via Kibana UI):
+
+POST _security/role/logstash_writer
+{
+  "cluster": ["manage_index_templates", "monitor", "manage_ilm"], 
+  "indices": [
+    {
+      "names": [ "logstash-*" ], 
+      "privileges": ["write","create","create_index","manage","manage_ilm"]  
+    }
+  ]
+}
+
+#in our case, we have 2 indices logstash-* and zabbix-*, so we modify this line:
+#!"names": [ "logstash-*" , "zabbix-*" ], 
+-----------------------------------------------------------------------
+Create a logstash_internal user and assign it the logstash_writer role:
+
+POST _security/user/logstash_internal
+{
+  "password" : "x-pack-test-password",
+  "roles" : [ "logstash_writer"],
+  "full_name" : "Internal Logstash User"
+}
+
+--------------------------------------------------------------------------------------------------
+Configure Logstash to authenticate as the logstash_internal user and enabling TLS/SSL Encryption:
+
+input {
+  elasticsearch {
+    ...
+    user => logstash_internal
+    password => x-pack-test-password
+  }
+}
+filter {
+  elasticsearch {
+    ...
+    user => logstash_internal
+    password => x-pack-test-password
+
+  }
+}
+output {
+  elasticsearch {
+    ...
+    user => logstash_internal
+    password => x-pack-test-password
+    ssl_enabled => true
+    ssl_certificate_authorities => '/path/to/cert.pem'
+  }
+}
+
+#in our case: /etc/pki/tls/certs/logstash-forwarder.crt
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Creation of certificates for use with Transport Layer Security (TLS) in the Elastic Stack:
+
+Generating a new certificate authority (CA) in PEM format:
+
+cd /usr/share/elasticsearch/bin
+./bin/elasticsearch-certutil ca --out /etc/pki/tls/certs/elastic-ca.zip --pem
+
+unzip /etc/pki/tls/certs/elastic-ca.zip -d /etc/pki/tls/certs/elastic-ca
+
+#if you are not sure where it is, run the command: find / -name "elasticsearch-certutil" 2>/dev/null
+
+---------------------------------------------------------------------
+Generating the logstash certificate, signed by that CA in PEM format:
+
+./bin/elasticsearch-certutil cert --ca-cert /etc/pki/tls/certs/logstash/ca.crt \
+--ca-key /etc/pki/tls/certs/logstash/ca.key \
+--name logstash --dns elk-srv --out /etc/pki/tls/certs/logstash-cert.zip --pem
+
+unzip /etc/pki/tls/certs/logstash/logstash-cert.zip -d /etc/pki/tls/certs/logstash
+
+#--dns= the elastic server's hostname
+
+********************************************************************************************
+#for managing packages:
+#Redhat Dandified YUM (DNF) is the default package manager, used to install, update, search and remove RPM-based software packages. It replace the old YUM tool starting in RHEL 
+
+sudo dnf install <package_name>
+sudo dnf remove <package_name>
+sudo dnf upgrade <package_name>
+sudo dnf search <package_name>
+sudo dnf list <package_name>
+sudo dnf info <package_name>
+sudo dnf install /path/to/package.rpm
+*********************************************************************************************
+---------------------------------------------------------
+Further details:
+
+https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-elasticsearch-with-rpm
+https://www.elastic.co/docs/reference/elasticsearch/configuration-reference/discovery-cluster-formation-settings
+https://www.elastic.co/docs/deploy-manage/distributed-architecture/discovery-cluster-formation/discovery-hosts-providers
+https://www.elastic.co/docs/deploy-manage/distributed-architecture/discovery-cluster-formation/modules-discovery-bootstrap-cluster
+https://www.elastic.co/docs/solutions/observability/apm/apm-server/configure-logging
+https://www.elastic.co/docs/reference/elasticsearch/command-line-tools/reset-password
+https://www.elastic.co/docs/deploy-manage/security/set-up-basic-security-plus-https#encrypt-http-communication
+https://www.elastic.co/guide/en/elasticsearch/reference/8.19/configuring-stack-security.html
+https://www.elastic.co/guide/en/logstash/8.19/ls-security.html#ls-http-auth-basic
+https://www.elastic.co/guide/en/elasticsearch/reference/8.19/important-settings.html
+https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/kibana-authentication#basic-authentication
+https://www.elastic.co/docs/reference/elasticsearch/command-line-tools/certutil#_synopsis_2
+https://www.elastic.co/docs/reference/logstash/plugins
+https://www.elastic.co/guide/en/logstash/8.19/plugins-inputs-beats.html
+https://www.elastic.co/guide/en/logstash/8.19/configuration-file-structure.html#array
+https://www.elastic.co/docs/reference/beats/filebeat/filebeat-reference-yml
+https://www.elastic.co/docs/reference/beats/filebeat/filebeat-input-filestream
+https://www.elastic.co/docs/reference/beats/filebeat/configuration-filebeat-options
+https://www.elastic.co/guide/en/elastic-stack/9.0/release-notes-beats-9.0.0.html
