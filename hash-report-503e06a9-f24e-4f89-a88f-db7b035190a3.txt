@@ -1,0 +1,35 @@
+═══════════════════════════════════════════════════════════════
+       CRYPTOGRAPHIC HASH VERIFICATION REPORT
+               Hash-File.Online v3.14.16
+═══════════════════════════════════════════════════════════════
+
+Report ID: 503e06a9-f24e-4f89-a88f-db7b035190a3
+Generated: August 22, 2026 at 09:39:52 PM GMT+1
+Title: Cryptographic Hash Verification Report
+Algorithm: SHA-512
+
+───────────────────────────────────────────────────────────────
+FILE VERIFICATION RESULTS
+───────────────────────────────────────────────────────────────
+
+[1] ELK--CentOS-Ubuntu.pdf
+    Size: 3.73 MB (3,909,435 bytes)
+    Hash: 77927fb81f0485d6062d1b59d201995926963aa7600bd2add89caa6788e06bdde3b195dce84b534c5b66b108e29c304c018cdd20041bad0967a06ae7646ef7bd
+    Status: ✓ VERIFIED
+
+───────────────────────────────────────────────────────────────
+SUMMARY
+───────────────────────────────────────────────────────────────
+Total Files: 1
+Successful: 1 (100.0%)
+Failed: 0 (0.0%)
+
+───────────────────────────────────────────────────────────────
+REPORT VERIFICATION
+───────────────────────────────────────────────────────────────
+Report Hash (SHA-256): 061b72a14e2c6d67c10600c711f039438109e3bfc186a4d407f9d8ff05f6c67c
+Verify at: https://hash-file.online/
+
+This report was generated using 100% client-side processing.
+No files were uploaded to any server.
+═══════════════════════════════════════════════════════════════
