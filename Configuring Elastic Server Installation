@@ -129,7 +129,7 @@ output.logstash:
 # The Logstash hosts
 hosts: ["elk-srv:5044"]
 
-#in case of one way TLS (a self-signed certificate issued by Elastic Server, which acts as a certificate authority (CA)). Keep this certificate in which the Issuer and SubjectName "/CN" are indentical-namely, "elk-srv":
+#in case of one way TLS (a self-signed certificate issued by Elastic Server, which acts as a certificate authority (CA)). Keep this certificate where the Issuer and SubjectName "/CN" are indentical-namely, "elk-srv":
 #ssl.certificate_authorities: ["/etc/pki/tls/certs/logstash-forwarder.crt"]
 ====================================================================================
 ------------------------------------------------------------------------------------------------------------------------------
