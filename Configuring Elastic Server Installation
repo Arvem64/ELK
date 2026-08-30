@@ -167,7 +167,7 @@ systemctl restart kibana
 
 #Otherwise, run /usr/share/elasticsearch/bin/elasticsearch-certutil http
 #be sure you select N to "Generate a CSR" (Certificate signing request to be sent to a trusted external or internal CA for signing) to generate a CRT instead, and Y to "using an existing CA" if you already created a CA for your cluster, when prompting
-#it's recommanded by Elastic to use the existing HTTP_CA certificate
+#it's recommended by Elastic to use the existing HTTP_CA certificate
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 other method:
