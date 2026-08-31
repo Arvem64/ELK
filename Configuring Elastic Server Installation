@@ -13,10 +13,12 @@ http.port: 9200
 
 discovery.type: single-node #(in case of 1 node in the cluster)
 
-xpack.security.enabled: true 
+xpack.security.enabled: true #(to enable security features: auth, TLS enforcement, RBAC "Role-Based Access Control")
 xpack.security.http.ssl.enabled: true #(to encrypt the traffic between the clients (logstash-kibana-curl) and Elasticsearch, it means Elasticsearch's REST API uses HTTPS instead of plain HTTP, it will be https://SERVER-IP@:9200) 
 xpack.security.transport.ssl.enabled: true #(to encrypt the elasticsearch node-to-node communication)
 xpack.security.transport.ssl.verification_mode: certificate
+
+#certificate: recommended by Elastic -- an appropriate verification mode for transport if the cluster topology changes often, because transport certs are issued per-CA-trust rather than matching hostname/IP for every node "full" (nodes get added/removed, so IPs change often), unless we have a stable DNS/hostnames per node.
 
 ************************************************************
 In case of multiple nodes, for load balancing and redundancy purposes (for example, 3 nodes 10.0.0.11, 10.0.0.12, 10.0.0.13 // subnet mask 255.255.255.0 -- The decimal equivalent /24):
@@ -279,6 +281,8 @@ https://www.elastic.co/docs/solutions/observability/apm/apm-server/configure-log
 https://www.elastic.co/docs/reference/elasticsearch/command-line-tools/reset-password
 https://www.elastic.co/docs/deploy-manage/security/set-up-basic-security-plus-https#encrypt-http-communication
 https://www.elastic.co/guide/en/elasticsearch/reference/8.19/configuring-stack-security.html
+https://www.elastic.co/docs/deploy-manage/security/set-up-basic-security#encrypt-internode-communication
+https://www.elastic.co/docs/reference/elasticsearch/configuration-reference/security-settings
 https://www.elastic.co/guide/en/logstash/8.19/ls-security.html#ls-http-auth-basic
 https://www.elastic.co/guide/en/elasticsearch/reference/8.19/important-settings.html
 https://www.elastic.co/docs/deploy-manage/users-roles/cluster-or-deployment-auth/kibana-authentication#basic-authentication
