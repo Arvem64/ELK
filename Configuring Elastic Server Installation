@@ -8,7 +8,7 @@ node.name: node-1 #(it does not necessarily have to match the hostname)
 path.data: /var/lib/elasticsearch
 path.logs: /var/log/elasticsearch
 
-network.host: 127.0.0.1 (default address) #(for example, in case of LAN, set to the server's private IP@ = 10.0.0.11, or to 0.0.0.0= listen on all available network interfaces)
+network.host: 127.0.0.1 (default address) #(for example, in case of LAN, set to the server's private IP@ = 10.0.0.11, or to 0.0.0.0 = listen on all available network interfaces)
 http.port: 9200
 
 discovery.type: single-node #(in case of 1 node in the cluster)
@@ -29,6 +29,11 @@ node.name: node-1 #(change it to node-2 / node-3 on other servers)
 network.host: 0.0.0.0 (a routable IP@ 0.0.0.0)
 http.port: 9200
 transport.port: 9300 #(default port, for communication between nodes)
+
+#add the firewall rules to allow only the authorized subnet, since the ports are listening on all interfaces:
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="10.0.0.0/24" port port="9200" protocol="tcp" accept'
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="10.0.0.0/24" port port="9300" protocol="tcp" accept'
+sudo firewal-cmd --reload
 
 cluster.initial_master_nodes: #(bootstrap --start-- the cluster using an initial set of master-eligible nodes, it means which nodes participate in creating the new cluster)
 - node-1
@@ -285,3 +290,5 @@ https://www.elastic.co/docs/reference/beats/filebeat/filebeat-reference-yml
 https://www.elastic.co/docs/reference/beats/filebeat/filebeat-input-filestream
 https://www.elastic.co/docs/reference/beats/filebeat/configuration-filebeat-options
 https://www.elastic.co/guide/en/elastic-stack/9.0/release-notes-beats-9.0.0.html
+https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/assembly_installing-rhel-9-content_managing-software-with-the-dnf-tool
+https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/security_guide/configuring_complex_firewall_rules_with_the_rich-language_syntax
