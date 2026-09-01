@@ -281,6 +281,8 @@ https://www.elastic.co/docs/solutions/observability/apm/apm-server/configure-log
 https://www.elastic.co/docs/reference/elasticsearch/command-line-tools/reset-password
 https://www.elastic.co/docs/deploy-manage/security/set-up-basic-security-plus-https#encrypt-http-communication
 https://www.elastic.co/guide/en/elasticsearch/reference/8.19/configuring-stack-security.html
+https://www.elastic.co/docs/deploy-manage/deploy/self-managed/installing-elasticsearch
+https://www.elastic.co/docs/reference/elasticsearch/jvm-settings
 https://www.elastic.co/docs/deploy-manage/security/set-up-basic-security#encrypt-internode-communication
 https://www.elastic.co/docs/reference/elasticsearch/configuration-reference/security-settings
 https://www.elastic.co/guide/en/logstash/8.19/ls-security.html#ls-http-auth-basic
