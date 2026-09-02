@@ -239,7 +239,7 @@ server {
 	     #protocol fowarded to kibana:: $scheme= https
          proxy_set_header X-Forwarded-Proto $scheme;
 
-         #forward the connection upgrade to kibana = did the client ask to upgrade the connection to "$http_upgrade = Websocket" instead of keeping it a normal HTTP:
+         #forward the connection upgrade to kibana = did the client ask to upgrade the connection to "$http_upgrade = Websocket" instead of keeping it a normal HTTP (this protocol allows thes erver to push information to the browser without this later repeatedly asking, unlike the HTTP protocol, the server waits for the client's request and the connection terminates when the server sends the response = both can send data to each other):
          proxy_set_header Upgrade $http_upgrade;
 
 	     #forward the "Upgrade" value of the previous line to kibana:
@@ -307,6 +307,29 @@ sudo firewall-cmd --zone=public --list-all
 sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="10.0.0.0/24" port port="443" protocol="tcp" accept'
 sudo firewall-cmd --reload
 sudo firewall-cmd --list-rich-rules
+
+***************************************************
+in certain cases, if you look for configuring Nginx on 80/tcp and forward data after via 443, add:
+
+server {
+
+     listen 80;
+     server_name elk-srv;
+
+     return 301 https://$host$request_uri;
+
+        server {
+            listen 443 ssl;
+            server_name elk-srv;
+
+                 ...
+              #the proxy_ssl_* is to configure the SSL between Nginx and Kibana:: https://127.0.0.1:5601, otherwise, if you keep the default configuration http://..., comment out that part 
+            }
+		}
+------------------------------------------
+#301 = permanent redirect
+#$host = hostname requested by the client
+#$request_uri = request path:: e.g. http://elk-srv/app
 
 -----------------------------------------------------------------
 other method:
@@ -480,3 +503,4 @@ https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/securit
 https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy
 https://docs.nginx.com/nginx/admin-guide/security-controls/terminating-ssl-http
 https://nginx.org/en/docs/http/ngx_http_proxy_module.html
+https://nginx.org/en/docs/http/websocket.html
