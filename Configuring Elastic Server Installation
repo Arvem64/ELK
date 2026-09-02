@@ -317,14 +317,13 @@ server {
      server_name elk-srv;
 
      return 301 https://$host$request_uri;
-
+   }
         server {
             listen 443 ssl;
             server_name elk-srv;
 
                  ...
-              #the proxy_ssl_* is to configure the SSL between Nginx and Kibana:: https://127.0.0.1:5601, otherwise, if you keep the default configuration http://..., comment out that part 
-            }
+              #the proxy_ssl_* is used to configure the SSL between Nginx and Kibana:: https://127.0.0.1:5601, otherwise, if you keep the default configuration http://..., comment out that part 
 		}
 ------------------------------------------
 #301 = permanent redirect
