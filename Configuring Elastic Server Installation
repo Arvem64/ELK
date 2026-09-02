@@ -383,7 +383,7 @@ unzip /etc/pki/tls/certs/elastic-ca.zip -d /etc/pki/tls/certs/elastic-ca
 Generating the logstash certificate, signed by that CA in PEM format:
 
 ./bin/elasticsearch-certutil cert --ca-cert /etc/pki/tls/certs/elastic-ca/ca.crt \
---ca-key /etc/pki/tls/certs/elastic-ca/ca.key \
+--ca-key /etc/pki/tls/private/elastic-ca/ca.key \
 --name logstash --dns elk-srv --out /etc/pki/tls/certs/logstash-cert.zip --pem
 
 unzip /etc/pki/tls/certs/logstash/logstash-cert.zip -d /etc/pki/tls/certs/logstash
@@ -393,7 +393,7 @@ unzip /etc/pki/tls/certs/logstash/logstash-cert.zip -d /etc/pki/tls/certs/logsta
 Generating the kibana certificate, signed by that CA in PEM format:
 
 ./bin/elasticsearch-certutil cert --ca-cert /etc/pki/tls/certs/elastic-ca/ca.crt \
---ca-key /etc/pki/tls/certs/elastic-ca/ca.key \
+--ca-key /etc/pki/tls/private/elastic-ca/ca.key \
 --name kibana --dns elk-srv --dns localhost --ip 127.0.0.1 --out /etc/pki/tls/certs/kibana-cert.zip --pem
 
 unzip /etc/pki/tls/certs/kibana/kibana-cert.zip -d /etc/pki/tls/certs/kibana
@@ -421,7 +421,7 @@ instances:
 ****************************************************************
 sudo /usr/share/elasticsearch/bin/elasticsearch-certutil cert \
   --ca-cert /etc/pki/tls/certs/elastic-ca/ca.crt \
-  --ca-key /etc/pki/tls/certs/elastic-ca/ca.key \
+  --ca-key /etc/pki/tls/private/elastic-ca/ca.key \
   --in /etc/elasticsearch/instances.yml \
   --out /etc/pki/tls/certs/elasticstack-cert.zip \
   --pem
