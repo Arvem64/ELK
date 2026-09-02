@@ -213,7 +213,7 @@ server {
          #reverse proxy(enabling TLS on both sides, browser <=> kibana, we configure the other side on kibana.yml)
          proxy_pass https://127.0.0.1:5601;
          
- 	     #CA used to verify Kibana's certificate, move it  CA to /etc/nginx/certs/: 
+ 	     #CA used to verify Kibana's certificate, move CA certificate to /etc/nginx/certs/: 
          proxy_ssl_trusted_certificate /etc/nginx/certs/ca.crt;
          
      	 #enable nginx to verify the cert presented by Kibana:
@@ -258,6 +258,14 @@ server {
 
      }
 }
+-------------------------------------
+Creating the authentication file:
+htpasswd -c /etc/nginx/.kibana-user admin
+TYPE_PASSWORD
+
+Test of the configuration:
+nginx -t
+systemctl restart nginx
 
 -------------------------------------------------------
 ######the configuration's type is LAN <=> nginx <=> kibana:
@@ -272,7 +280,7 @@ NGINX
  |
  | https://127.0.0.1 or https://localhost
  | certificate: kibana.crt
- | SAN = IP:127.0.0.1
+ | SAN = DNS:localhost/ IP:127.0.0.1
  V
 Kibana
 
@@ -287,8 +295,8 @@ kibana.crt
      |-- DNS:localhost
      |-- IP:127.0.0.1
 
+**************************************
 #!Important:
-
 #check:
 sudo firewall-cmd --get-active-zones
 
@@ -299,15 +307,6 @@ sudo firewall-cmd --zone=public --list-all
 sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="10.0.0.0/24" port port="443" protocol="tcp" accept'
 sudo firewall-cmd --reload
 sudo firewall-cmd --list-rich-rules
-
--------------------------------------
-Creating the authentication file:
-htpasswd -c /etc/nginx/.kibana-user admin
-TYPE_PASSWORD
-
-Test of the configuration:
-nginx -t
-systemctl restart nginx
 
 -----------------------------------------------------------------
 other method:
