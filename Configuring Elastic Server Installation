@@ -233,13 +233,13 @@ server {
          
          #this preserves the client IP through proxy chain, it means, keep any existing X-Forwarded-For and add the current client's @IP:
  	     ##if there is no proxy/load balancer before nginx, the X-Forwarded-For forwarded to kibana stays the same as the X-Real-IP:
-         ##if there is a proxy/load balancer before nginx, and e.g., its IP@=192.168.2.5 & the remote machine 10.0.0.22, the X-Real-IP then will turn into 192.168.2.5(because it will be the remote IP@ to nginx -linked directly to it-) and it will be appended in the right side of the header by nginx where the original client IP 10.0.0.22 is already stored. the X-Forwarded-For = 10.0.0.22, 192.168.2.5 and it will be passed to kibana :
+         ##if there is a proxy/load balancer before nginx, and e.g., its IP@=192.168.2.5 & the remote machine 10.0.0.22, the X-Real-IP then will turn into 192.168.2.5(because it will be the remote IP@ to nginx -linked directly to it-) and it will be appended in the right side of the header by nginx where the original client IP 10.0.0.22 is already stored. So, X-Forwarded-For = 10.0.0.22, 192.168.2.5 will be passed to kibana :
        	 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
 	     #protocol fowarded to kibana:: $scheme= https
          proxy_set_header X-Forwarded-Proto $scheme;
 
-         #forward the connection upgrade to kibana = did the client ask to upgrade the connection to "$http_upgrade = Websocket" instead of keeping it a normal HTTP (this protocol allows thes erver to push information to the browser without this later repeatedly asking, unlike the HTTP protocol, the server waits for the client's request and the connection terminates when the server sends the response = both can send data to each other):
+         #forward the connection upgrade to kibana = did the client ask to upgrade the connection to "$http_upgrade = Websocket" instead of keeping it a normal HTTP (this protocol allows the server to push information to the browser without this later repeatedly asking, unlike the HTTP protocol, the server waits for the client's request and the connection terminates when the server sends the response = both can send data to each other):
          proxy_set_header Upgrade $http_upgrade;
 
 	     #forward the "Upgrade" value of the previous line to kibana:
@@ -326,9 +326,11 @@ server {
               #the proxy_ssl_* is used to configure the SSL between Nginx and Kibana:: https://127.0.0.1:5601, otherwise, if you keep the default configuration http://..., comment out that part 
 		}
 ------------------------------------------
+#http://elk-srv/app => https://elk-srv/app
+
 #301 = permanent redirect
 #$host = hostname requested by the client
-#$request_uri = request path:: e.g. http://elk-srv/app
+#$request_uri = request path:: e.g. /app
 
 -----------------------------------------------------------------
 other method:
