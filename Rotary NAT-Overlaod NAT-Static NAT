@@ -1,0 +1,190 @@
+Rotary NAT Configuration for Load Balancing /Destination NAT:
+
+!WAN interface G0/0: Static Public IP@ xxx.230.74.172 
+!LAN interface G0/1: 10.0.0.1
+!three Elastic Servers: 10.0.0.11/ 10.0.0.12/ 10.0.0.13
+!Clients' Public IP: xxx.230.74.130 (static)
+----------------------------------------------------------------------------------------
+!The inside and outside interfaces change depending on which interface the traffic hits
+!The interface facing the internet G0/0 turns into:: ip nat inside
+!The interface facing the servers on LAN G0/1 turns into:: ip nat outside
+
+!interface G0/0 
+!ip nat inside   <-- Public interface receiving the initial traffic
+
+!interface G0/1   == interface <Internal_LAN_Interface>
+!ip nat outside   <-- Private interface facing servers 10.0.0.11/*.12/*.13
+
+---------------------------------------------------------------------------
+!Interface Inside:
+
+Router(config)# interface G0/0
+Router(config-if)# ip address xxx.230.74.172 255.255.255.0
+Router(config-if)# ip nat inside
+Router(config-if)# no shutdown
+Router(config-if)# exit
+
+!Interface Outside:
+Router(config)# interface G0/1
+Router(config-if)# ip address 10.0.0.1 255.255.255.0
+Router(config-if)# ip nat outside
+Router(config-if)# no shutdown
+Router(config-if)# exit
+
+
+!Define a pool of the internal servers' IPs  
+!Pool_@_Nbr = (END@ - Start@)+1 = (.13 - .11)+1 = 3 addresses
+!Server Range = 10.0.0.11/10.0.0.12/10.0.0.13
+!prefix-length 24 == subnet mask
+!type rotary = activate the load distribution method (the clients send TCP traffic to the public IP@ xxx.230.74.172 and the router distribute those incoming connections across the servers in the pool - acting as a TCP Load Balancer - using the round-robin algorithm (cycling through that pool list))
+
+Router(config)# ip nat pool POOL_SERVERS 10.0.0.11 10.0.0.13 prefix-length 24 type rotary
+
+!Create ACL matching the external IP
+!destination IP = xxx.230.74.172
+!In case of range of ports, use "range" instead of "eq" 
+Router(config)# access-list 101 permit tcp host xxx.230.74.130 host xxx.230.74.172 eq 5044
+
+!Apply the destination NAT
+!ip nat inside destination == access-list
+Router(config)# ip nat inside destination access-list 101 pool POOL_SERVERS
+
+---------------------------------------------------------------------------
+!ACL Number 
+
+Standard ACL (1-99): access-list [number] permit [source]
+Extended ACL (100-199): access-list [number] permit [protocol] [source] [destination]
+---------------------------------------------------------------------------------------
+Range       | ACL Type    | What it can match against   | Common Use Case
+---------------------------------------------------------------------------------------
+1-99        | Standard    | Source IP only              | Dynamic PAT/Overload rules
+---------------------------------------------------------------------------------------
+100-199     | Extended    | Source IP, Destination IP,  | Port Forwarding, firewall
+            |             | Protocols(TCP/UCP), Port    | rules
+            |             | numbers                     | 
+---------------------------------------------------------------------------------------
+1300-1999   | Standard    | Source IP only              | Used if you run out of 
+            | (Expanded)  |                             | numbers under 100
+---------------------------------------------------------------------------------------
+2000-2699   | Extended    | Source IP, Destination IP,  | Used if you run out of 
+            | (Expanded)  | Ports                       | numbers under 200       
+---------------------------------------------------------------------------------------
+*******************************************************************************************
+!Preventing the server from sending packets to a broken server: IP SLA (pinging servers and checking the TCP Port) + Object track rule
+
+!Rotary NAT does not automatically check if a server is down. If it crashes, the router will still try to send every second connection to it. To address this, we should add an IP SLA tracking rule to make the load balancer skip a server if it goes down.
+
+***********************************
+1. Configuring the IP SLA Monitors
+
+!Create a tracking profile for each node:
+
+!configure ip sla <SLA_name>
+Router(config)# ip sla 11
+
+!tcp-connect= checks if a specific service/port is alive
+!TCP 3-way handshake = 1- router sends a SYN to the server/ 2- server responses with a SYN-ACK if it's up/ 3- router answers with an ACK(completing the handshake) and closes connection with RST or FIN packet. If the 3 steps are successfully done => Mark server as "Up", otherwise "Down"
+!check TCP/5044 if alive on 10.0.0.11
+Router(config-sla)# tcp-connect 10.0.0.11 5044
+
+!check every 5 seconds
+Router(config-sla)# frequency 5
+Router(config-sla)# exit
+
+!schedule "sla 11" 
+!life forever = unlimited checking, if for a specific period of time, set time in seconds:: life 36000
+!start-time now = enable rule now, if at a later time, e.g. set start-time 01:00:00
+Router(config)# ip sla schedule 11 life forever start-time now
+
+=========================
+Router(config)# ip sla 12
+Router(config-sla)# tcp-connect 10.0.0.12 5044
+Router(config-sla)# frequency 5
+Router(config-sla)# exit
+Router(config)# ip sla schedule 12 life forever start-time now
+
+=========================
+Router(config)# ip sla 13
+Router(config-sla)# tcp-connect 10.0.0.13 5044
+Router(config-sla)# frequency 5
+Router(config-sla)# exit
+Router(config)# ip sla schedule 13 life forever start-time now
+
+****************************************
+2. Configuring the tracking monitors
+
+!router creates a tracking monitor "track 11" - tracking Object ID = 11 - that watches a specific network event "ip sla 11 state" and reports back that event is UP or DOWN  
+!depending on the handshake state "ok" => mark track 11 as "Up" or "Down" if state "error"
+!IP SLA 11 must match the IP SLA that it has been configured when creating the tracking profile and the one that it should be monitored
+
+Router(config)# track 11 ip sla 11 state
+Router(config)# track 12 ip sla 12 state
+Router(config)# track 13 ip sla 13 state
+
+*****************************************
+3. Configuring the tracked static routes
+
+!add a static route into the router's routing table to the destination e.g. 10.0.0.11 and deliver traffic to it through the exit interface G0/1 as long as "conditional trigger == Track 11" is UP, if it goes down, remove that route from the routing table
+
+!255.255.255.255 = host mask, prefix /32:: explicitly specifying one exact IP address and not the entire subnet because of, if one server crashes, the router would pull the route for the entire LAN
+!GigabitEthernet0/1 = interface facing the servers in the Inside Local
+
+Router(config)# ip route 10.0.0.11 255.255.255.255 GigabitEthernet0/1 track 11
+Router(config)# ip route 10.0.0.12 255.255.255.255 GigabitEthernet0/1 track 12
+Router(config)# ip route 10.0.0.13 255.255.255.255 GigabitEthernet0/1 track 13
+
+=======================================
+!Display handshake state (Ok or Error)
+Router# show ip sla summary
+!Display state (Up or Down)
+Router# show track
+******************************************************************************
+Configuring Outbound traffic: NAT Overload/PAT
+
+!create a Standard ACL matching the internal LAN subnet traffic going out
+Router(config)# access-list 1 permit 10.0.0.0 0.0.0.255
+
+!configure the PAT rule using the WAN interface
+!ip nat inside source = list
+Router(config)# ip nat inside source list 1 interface GigabitEthernet0/0 overload
+
+
+!Important: Don't change the interface commands. Keep the Rotary NAT configuration: G0/0(WAN) ip nat inside// G0/1(LAN) ip nat outside. The router will automatically reverse its translation logic and properly overload the trafic to the public IP.
+
+==========================================================
+==========================================================
+==========================================================
+
+!Save configuration from router's temporary RAM to NVRAM
+Router# copy running-config startup-config
+!or
+Router# write memory
+
+!in case of a complete script:
+!paste the script at the global configuration level and run after:
+Router# copy run start
+
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+!Additional:: IN CASE OF: Static NAT
+
+!Map private port 5044 to public port 5044
+Router(config)# ip nat inside static source tcp [PRIVATE-IP] 5044 [PUBLIC-IP] 5044
+
+!in case of one port linked to Outside-Interface:
+Router(config)# ip nat inside source static tcp [PRIVATE-IP] [PRIVATE-PORT] interface GigabitEthernet0/0 [PUBLIC-PORT]
+
+
+!in case of range of ports (for distinct cases) and the router supports the Object Group option:
+!create a service group for the port range
+Router(config)# object-group RANGE_PORTS tcp
+Router(config-object-group)# port-range 5044-5045
+Router(config-object-group)# exit
+
+!apply the object group to the static translation rule
+Router(config)# ip nat inside source static tcp PRIVATE-IP@ service RANGE_PORTS interface GigabitEthernet0/0 service RANGE_PORTS
+
+!show ip nat table
+Router# show ip nat translations
