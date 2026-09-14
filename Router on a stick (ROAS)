@@ -24,8 +24,13 @@ Switch1(config-if-range)# exit
 Switch1(config)# interface fastEthernet 0/7
 Switch1(config-if)# description TRUNK-ROUTER
 Switch1(config-if)# switchport mode trunk 
+Switch1(config-if)# switchport trunk allowed vlan 15, 16
 Switch1(config-if)# exit
-        
+
+!in case of 1 port attached to 1 vlan:
+!Switch1(config)# interface gigabitEthernet 0/1
+!Switch1(config-if)# .... ....
+
 ---------------------------------------------------------
 Configuring the router (10.0.15.1 and 10.0.16.1 are the gateway's addresses):
 
@@ -42,6 +47,16 @@ Router1(config-subif)# end
 Router1# configure terminal 
 Router1(config)# interface gigabitEthernet 0/0
 Router1(config-if)# no shutdown 
+
+*************************************
+Verification:
+
+Router1# show ip interface brief
+Router1# show vlan brief
+
+Switch1# show interfaces trunk
+Switch1# show vlan brief
+
 --------------------------------------------
 Configuring DHCP:
 
