@@ -9,19 +9,19 @@ Switch1(config-vlan)# vlan 16
 Switch1(config-vlan)# name CTRLSERVERS
 Switch1(config-vlan)# exit
 
-Switch1(config)# interface range fastEthernet 0/1-4
+Switch1(config)# interface range gigabitEthernet 0/1-4
 Switch1(config-if-range)# description CLIENTSSERVRS
 Switch1(config-if-range)# switchport mode access 
 Switch1(config-if-range)# switchport access vlan 15
 Switch1(config-if-range)# exit
 
-Switch1(config)# interface range fastEthernet 0/12-16
+Switch1(config)# interface range gigabitEthernet 0/12-16
 Switch1(config-if-range)# description CTRLSERVERS
 Switch1(config-if-range)# switchport mode access 
 Switch1(config-if-range)# switchport access vlan 16
 Switch1(config-if-range)# exit
 
-Switch1(config)# interface fastEthernet 0/7
+Switch1(config)# interface gigabitEthernet 0/7
 Switch1(config-if)# description TRUNK-ROUTER
 Switch1(config-if)# switchport mode trunk 
 Switch1(config-if)# switchport trunk allowed vlan 15, 16
