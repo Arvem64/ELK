@@ -49,16 +49,14 @@ discovery.seed_hosts: #(a string containing the addresses separated by commas, t
 - 10.0.0.12
 - 10.0.0.13
 
+systemctl restart elasticsearch
+
 *********************************************
 Set Built-in Users Password:
 cd /usr/share/elasticsearch/bin
 ./elasticsearch-reset-password -u elastic -i
 
 #for the user= elastic
---------------------------------------------------------------------------------------
-#!Deprecated: /usr/share/elasticsearch/bin/elasticsearch-setup-passwords interactive
---------------------------------------------------------------------------------------
-systemctl restart elasticsearch
 
 ***********************************************************************
 Configure Logstash Authentication
@@ -186,6 +184,9 @@ server {
 
      #Configure SSL on port 443:
      listen 443 ssl;
+
+     #Configure SSL on a specific address [Private-IP@]:443 :: this guarantees Nginx completely ignores request coming from WAN interface
+     #listen 10.0.0.13:443 ssl;  
 
      #users access https://elk-srv
      server_name elk-srv;
