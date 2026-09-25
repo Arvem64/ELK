@@ -1,0 +1,130 @@
+TLS 1.3 modern connection : It starts with ECDHE coordinates in plaintext, after that, presenting an RSA /ECDSA certificate (website identity) to verify the signature (No Static RSA used to encrypt the handshake).
+
+*****************************************************************************
+TLS 1.3:
+
+1. KEY EXCHANGE START       --> Browser & Server exchange public ECDHE coordinates
+				     |
+2. ENCRYPTION SWITCH        --> Both sides calculate the 256-bit Session Key
+                                     |
+3. AUTHENTICATION           --> Server uses RSA or ECDSA to sign the exchange (encrypted under handshake key)
+                                   Browser verifies the signature
+                                     |
+4. APPLICATION KEY DERIVED  --> New key derived, using AES-GCM/ChaCha20
+   + SECURE DATA TRAFFIC           Traffic starts
+                                 		
+**************************************************************************
+256-bit Elliptic Curve Diffie-Hellman (ECDH) key exchange:
+
+--------------------------------------
+Step 1: the global modulo
+
+Before the browser even connects, the entire internet agrees on a standard curve and a massive prime number P. The most common one is called X25519. Its modulo prime: p = (2^255) - 19
+
+in hexadecimal, it looks like a string 64 of characters long (256 bits in binary = 64 bits in hex): 
+
+7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd 
+
+The Base Generator Point G: a fixed starting point on the elliptic curve. For Curve 25519, it coordinate value = 9, padded to 64 hex characters: 
+
+0000000000000000000000000000000000000000000000000000000000000009
+
+-----------------------------------------------------------------
+Step 2: choosing the private keys
+
+Both the browser and server randomly generate their own private keys:
+
+- Browser Private Key(a): e4b3f774b52b8b86f680020862e9e9576823a7b38ffa32cf47432ee5b7d29f38
+- Server Private Key(b): 827a98e9308c7d6a9gj52de388b6007a0bc4be31d25088cd4e3dne6018a7b223
+
+-----------------------------------------------------------------------
+Step 3: calculating the public key = calculating a public point on the elliptic curve using a standard base point G and the modulo prime P
+
+         Public Key = (Private Key x G)(mod p)
+
+In elliptic curve math, "x" = scalar multiplication--adding the point G to itself n times along te curve == A x A x A x A = 4A
+
+1. Browser Public Key A:
+            
+           A = (a x G)(mod p) ==> ECDHE coordinate = ClientHello
+
+The browser sends this to the server over the internet
+
+2. Server Public Key B:
+            
+           B = (b x G)(mod p) ==> ECDHE coordinate = ServerHello
+
+The server sends this to the browser over the internet
+
+This step of the exchange (the public EDCHE coordinates) is completely unencrypted because the browser and the server have never met before, they must send their initial mathematical coordinates over the internet in plaintext.
+
+-----------------------------------------------------------------
+Step 4: creating the session key
+
+Both sides take the public key they received and multiply it by their own private keys:
+
+           Shared Session Key = (a x B)(mod p) == (b x A)(mod p)
+ 
+This AES-256-GCM session key is locally calculated and used for encrypting passwords and every message after this point--including the website certificate and identity signatures-- using those handshake keys. 
+
+
+We should add ECH Encrypted Client Hello
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+To calculate the OpenSSL session keys:
+
+#generate the raw 256-bit private key
+openssl genkey -algorithm x25519 -out browser_private_key.pem
+openssl genkey -algorithm x25519 -out server_private_key.pem
+
+#extract and calculate the public key from those private keys to send over the network
+openssl pkey -in browser_private_key.pem -pubout -out browser_public.pem
+openssl pkey -in server_private_key.pem -pubout -out server_public.pem
+
+#calculating the raw shared secret
+
+##pkeyutl = manually calculate the Elliptic Curve public key directly from a private key
+##derive (key derivation) = generating a new cryptographic key from a base secret or from existing keys using a repeatable mathematical function
+##inkey = private key
+##peerkey = public key received from the other side over internet
+##openssl pkeyutl -derive = CPU takes the private key and combines it with the received public key:: a x B = b x A
+##*.bin = to keep data in its rawest form (binary 0 1)
+
+openssl pkeyutl -derive -inkey browser_private_key.pem -peerkey server_public.pem -out shared_session_key.bin
+
+#hashing step (HKDF): in TLS 1.3, we run the AES key through a key derivation hashing function-sha256- to ensure uniform randomness to get the final uniform 256-bit AES-GCM session key
+
+##AES = encryption algorithm
+##GCM = creating a digital fingerprint to prevent tampering with data by hashing (GHash algorithm) the encrypted block (16 bytes) alongside the unencrypted AAD part (Additional Authentification Data) = TLS Record Header*. It turns block cipher to stream cipher.
+
+##dgst = calculate the cryptographic hash (digest) using a hashing algorithm
+##hex = output in hexadecimal
+
+openssl dgst -sha256 -hex shared_secret.bin > session_key.txt
+
+==============================================
+*TLS Record Header Metadata:
+
+- Content type (1 byte):: kind of data inside the encrypted payload:
+      0x16 for handshake message
+      0x17 for Application Data/Web traffic
+
+- Legacy TLS version (2 bytes):: 0x0303: TLS 1.2, 1.3 = initiating encrypted web browsing
+
+- Length (2 bytes):: payload size
+
+***********************************************************************
+Summary Matrix
+
+Protocol  | Identity Verification   | Key Exchange Algorithm   | Bulk Traffic 
+Version   | (Digital Signature)     | (How keys are generated) | Encryption
+------------------------------------------------------------------------------
+TLS 1.2   | RSA or ECDSA    	    | Static RSA, DHE or ECDHE | AES-GCM
+------------------------------------------------------------------------------
+TLS 1.3   | RSA or ECDSA (prefers   | Mandated ECDHE or DHE    | AES-GCM or
+          | ECDSA)                  |                          | ChaCha20
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+Old TLS 1.2 : The browser randomly generates the master key, encrypts it with the website's RSA Public Key and sends it after. The handshake keys are created after sending that encrypted package ((Static RSA) No plaintext ECDHE exchange).
