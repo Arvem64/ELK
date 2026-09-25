@@ -563,7 +563,7 @@ systemd-creds encrypt /etc/pki/tls/private/nginx_tls_passphrase.txt /etc/pki/tls
 #encrypt using a key derived from the machine's own TPM 2.0 (if available) or a host-specific key stored in /var/lib/systemd/credential.secret
 #.cred file can only be decrypted on the same machine, to enforce this behavior add:: --with-key=host
 #rm /etc/pki/tls/private/nginx_tls_passphrase.txt
-#nginx_identity.key's passphrase is automatically decrypted by systemd because it's declared in nginx's unit file via LoadCredntialEncrypted=nginx_pass:/etc/pki/tls/private/nginx_tls_passphrase.cred => every systemctl start nginx or restart runs, system decrypts it as part of the service startup sequence (only in-memory), so no manual systemd-creds decrypt invocation needed
+#nginx_identity.key's passphrase is automatically decrypted by systemd because it's declared in nginx's unit file via LoadCredntialEncrypted=nginx_pass:/etc/pki/tls/private/nginx_tls_passphrase.cred => every systemctl start nginx or restart runs, systemd decrypts it as part of the service startup sequence (only in-memory), so no manual systemd-creds decrypt invocation needed
 
 ##Encryption steps:
 #systemd starts the nginx as root
