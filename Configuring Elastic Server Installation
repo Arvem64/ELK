@@ -200,7 +200,7 @@ server {
      #recommended: passphrase stored in plaintext to the tmpfs file, to decrypt the encrypted private key:
      ssl_password_file /run/credentials/nginx.service/nginx_tls_passphrase;
 
-     #tells nginx where to find the passphrase for its encrypted TLS private key and the file must have chmod 600 -- read-only:
+     #tells nginx where to find the passphrase for its encrypted TLS private key and the file must have chmod 400 -- read-only:
      #!passphrase is in plaintext:
      #ssl_password_file /etc/nginx/nginx_tls_passphrase.txt;
 
