@@ -556,7 +556,7 @@ openssl rand -base64 32 >/etc/nginx/nginx_tls_passphrase.txt
 chmod 600 /etc/nginx/nginx_tls_passphrase.txt
 chown root:root /etc/nginx/nginx_tls_passphrase.txt
 
-#since nginx runs under system, we can use systemd-creds for managing credentials that services can consume at runtime without the plaintext ever sitting persistently on disk or being readable via environment variable/process args:
+#since nginx runs under systemd, we can use systemd-creds for managing credentials that services can consume at runtime without the plaintext ever sitting persistently on disk or being readable via environment variable/process args:
  
 systemd-creds encrypt /etc/pki/tls/private/nginx_tls_passphrase.txt /etc/pki/tls/private/nginx_tls_passphrase.cred
 
