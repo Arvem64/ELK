@@ -192,10 +192,10 @@ server {
      server_name elk-srv;
 
      #the public cert that Nginx presents to the browser (LAN Client) -- if users access https://elk-srv then, the cert should have SAN=DNS:elk-srv:
-     ssl_certificate  /etc/nginx/certs/kibana.crt;
+     ssl_certificate  /etc/nginx/certs/nginx_identity.crt;
 
      #the private key is to keep on the server:
-     ssl_certificate_key /etc/nginx/certs/kibana.key;
+     ssl_certificate_key /etc/nginx/certs/nginx_identity.key;
 
      #recommended: passphrase stored in plaintext to the tmpfs file, to decrypt the encrypted private key:
      ssl_password_file /run/credentials/nginx.service/nginx_tls_passphrase;
@@ -281,13 +281,13 @@ systemctl restart nginx
 LAN 
  |
  | https://elk-srv:443
- | certificate: kibana.crt
+ | certificate: nginx_identity.crt
  | SAN = DNS:elk-srv
  V
 NGINX
  |
  | https://127.0.0.1 or https://localhost
- | certificate: kibana.crt
+ | certificate: kibana_identity.crt
  | SAN = DNS:localhost/ IP:127.0.0.1
  V
 Kibana
