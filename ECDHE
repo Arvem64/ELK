@@ -4,7 +4,7 @@ TLS 1.3 modern connection : It starts with ECDHE coordinates in plaintext, after
 TLS 1.3:
 
 1. KEY EXCHANGE START       --> Browser & Server exchange public ECDHE coordinates
-				     |
+				                     |
 2. ENCRYPTION SWITCH        --> Both sides calculate the 256-bit Session Key
                                      |
 3. AUTHENTICATION           --> Server uses RSA or ECDSA to sign the exchange (encrypted under handshake key)
@@ -21,7 +21,7 @@ Step 1: the global modulo
 
 Before the browser even connects, the entire internet agrees on a standard curve and a massive prime number P. The most common one is called X25519. Its modulo prime: p = (2^255) - 19
 
-in hexadecimal, it looks like a string 64 of characters long (256 bits in binary = 64 bits in hex): 
+in hexadecimal, it looks like a 64-character string (256 bits in binary = 64 bits in hex): 
 
 7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd 
 
@@ -32,7 +32,7 @@ The Base Generator Point G: a fixed starting point on the elliptic curve. For Cu
 -----------------------------------------------------------------
 Step 2: choosing the private keys
 
-Both the browser and server randomly generate their own private keys:
+Both the browser and server randomly generate their own private key:
 
 - Browser Private Key(a): e4b3f774b52b8b86f680020862e9e9576823a7b38ffa32cf47432ee5b7d29f38
 - Server Private Key(b): 827a98e9308c7d6a9gj52de388b6007a0bc4be31d25088cd4e3dne6018a7b223
@@ -42,7 +42,7 @@ Step 3: calculating the public key = calculating a public point on the elliptic 
 
          Public Key = (Private Key x G)(mod p)
 
-In elliptic curve math, "x" = scalar multiplication--adding the point G to itself n times along te curve == A x A x A x A = 4A
+In elliptic curve math, "x" = scalar multiplication--adding the point G to itself n times along the curve == A x A x A x A = 4A
 
 1. Browser Public Key A:
             
@@ -84,7 +84,7 @@ openssl pkey -in server_private_key.pem -pubout -out server_public.pem
 
 #calculating the raw shared secret
 
-##pkeyutl = manually calculate the Elliptic Curve public key directly from a private key
+##pkeyutl = (public key utility) manually calculate the Elliptic Curve public key directly from a private key
 ##derive (key derivation) = generating a new cryptographic key from a base secret or from existing keys using a repeatable mathematical function
 ##inkey = private key
 ##peerkey = public key received from the other side over internet
@@ -128,3 +128,51 @@ TLS 1.3   | RSA or ECDSA (prefers   | Mandated ECDHE or DHE    | AES-GCM or
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 Old TLS 1.2 : The browser randomly generates the master key, encrypts it with the website's RSA Public Key and sends it after. The handshake keys are created after sending that encrypted package ((Static RSA) No plaintext ECDHE exchange).
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+other method to generate session keys with python:
+
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+#load browser's private key (64 hex characters)
+prvt_hex = "e4b3f774b52b8b86f680020862e9e9576823a7b38ffa32cf47432ee5b7d29f38"
+prvt = x25519.X25519PrivateKey.from_private_bytes(bytes.fromhex(prvt_hex))
+
+#load the received server's public key
+pblc_hex = "ca2c0fa02f2f8e71898ffb2dadb9b11cacf59115b742e55538c8f177fed7a0c3"
+pblc = x25519.X25519PublicKey.from_public_bytes(bytes.fromhex(pblc_hex))
+
+#perform (a X B mod p) Elliptic curve multiplication loop
+raw_shared_secret = prvt.exchange(pblc)
+
+#derivation step: standard TLS 1.3 HKDF expansion to create the 256-bit AES-GCM key
+hkdf = HKDF(
+     algorithm=SHA256()
+     length=32 #32 bytes = 256 bits
+     salt=None,
+     info=b"tls13 client application traffic secret" #context label
+) 
+
+final_session_key = hkdf.derive(raw_shared_secret)
+
+print("256-bit AES-session key:",final_session_key.hex())
+
+*************************************
+x25519 = python module (file/folder)
+X25519PrivateKey = a class representing a secret X25519 private key, which is used in elliptic-curve Diffie-Hellman (ECDH) key exchanges to establish a shared secret
+from_private_bytes() = a constructor method that load the binary bytes (32 bytes for X25519) and converts them into an executable X25519PublicKey object so python can perform mathematical cryptographic operations on them
+X25519PublicKey = a class representing an X25519 public key, which is used in elliptic-curve Diffie-Hellman (ECDH) key exchanges to establish a shared secret
+from_public_bytes() = a constructor method that load the binary bytes (32 bytes for X25519) and instantiates them into an executable X25519PublicKey object
+object.bytes.fromhex() = a built-in python function that converts a string of hexadecimal characters into standard raw binary (bytes)
+exchange() = it multiplies the private key by the received public key to calculate the raw shared secret
+#HKDF() = HMAC-based Extract-and-Expand Key Derivation Function. It takes a raw structured shared secret and cleans it into a perfectly random cryptography key suitable for symmetric encryption like AES
+#salt=none:: a random string of 0 used to make te key derivation even stronger 
+#info=b"..." a context label that binds the resulting key to a specific purpose so that the same shared secret can't accidentally produce the exact same key for a different application protocol
+#b prefix : it tells python to treat the string as a bytes literal instead of regular text string, as cryptographic functions only accept raw binary data
+#derive() = run the raw shared secret through the HMAC of the HDKF and generate the final 256-bit AES session key
+
+https://docs.openssl.org/master/man1/openssl-x509/#input-output-and-general-purpose-options
+https://cryptography.io/en/latest/
