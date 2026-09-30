@@ -166,10 +166,10 @@ X25519PrivateKey = a class representing a secret X25519 private key, which is us
 from_private_bytes() = a constructor method that load the binary bytes (32 bytes for X25519) and converts them into an executable X25519PublicKey object so python can perform mathematical cryptographic operations on them
 X25519PublicKey = a class representing an X25519 public key, which is used in elliptic-curve Diffie-Hellman (ECDH) key exchanges to establish a shared secret
 from_public_bytes() = a constructor method that load the binary bytes (32 bytes for X25519) and instantiates them into an executable X25519PublicKey object
-object.bytes.fromhex() = a built-in python function that converts a string of hexadecimal characters into standard raw binary (bytes)
+object.bytes.fromhex() = a built-in python class's method that converts a string of hexadecimal characters into standard raw binary (bytes) -- bytes = class and fromhex() = a constractor method 
 exchange() = it multiplies the private key by the received public key to calculate the raw shared secret
 #HKDF() = HMAC-based Extract-and-Expand Key Derivation Function. It takes a raw structured shared secret and cleans it into a perfectly random cryptography key suitable for symmetric encryption like AES
-#salt=none:: a random string of 0 used to make the key derivation even stronger 
+#salt=None:: a random string of 0 (blank value = null bytes 0x00) used to make the key derivation even stronger 
 #info=b"..." a context label that binds the resulting key to a specific purpose so that the same shared secret can't accidentally produce the exact same key for a different application protocol
 #b prefix : it tells python to treat the string as a bytes literal instead of regular text string, as cryptographic functions only accept raw binary data
 #derive() = run the raw shared secret through the HMAC of the HDKF and generate the final 256-bit AES session key
