@@ -25,7 +25,7 @@ in hexadecimal, it looks like a 64-character string (256 bits in binary = 64 bit
 
 7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd 
 
-The Base Generator Point G: a fixed starting point on the elliptic curve. For Curve 25519, it coordinate value = 9, padded to 64 hex characters: 
+The Base Generator Point G: a fixed starting point on the elliptic curve. For Curve 25519, its coordinate value = 9, padded to 64 hex characters: 
 
 0000000000000000000000000000000000000000000000000000000000000009
 
@@ -150,8 +150,8 @@ raw_shared_secret = prvt.exchange(pblc)
 
 #derivation step: standard TLS 1.3 HKDF expansion to create the 256-bit AES-GCM key
 hkdf = HKDF(
-     algorithm=SHA256()
-     length=32 #32 bytes = 256 bits
+     algorithm=SHA256(),
+     length=32, #32 bytes = 256 bits
      salt=None,
      info=b"tls13 client application traffic secret" #context label
 ) 
@@ -169,7 +169,7 @@ from_public_bytes() = a constructor method that load the binary bytes (32 bytes 
 object.bytes.fromhex() = a built-in python function that converts a string of hexadecimal characters into standard raw binary (bytes)
 exchange() = it multiplies the private key by the received public key to calculate the raw shared secret
 #HKDF() = HMAC-based Extract-and-Expand Key Derivation Function. It takes a raw structured shared secret and cleans it into a perfectly random cryptography key suitable for symmetric encryption like AES
-#salt=none:: a random string of 0 used to make te key derivation even stronger 
+#salt=none:: a random string of 0 used to make the key derivation even stronger 
 #info=b"..." a context label that binds the resulting key to a specific purpose so that the same shared secret can't accidentally produce the exact same key for a different application protocol
 #b prefix : it tells python to treat the string as a bytes literal instead of regular text string, as cryptographic functions only accept raw binary data
 #derive() = run the raw shared secret through the HMAC of the HDKF and generate the final 256-bit AES session key
