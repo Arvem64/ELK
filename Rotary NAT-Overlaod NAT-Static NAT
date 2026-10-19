@@ -171,7 +171,7 @@ Router# copy run start
 !Additional:: IN CASE OF: Static NAT
 
 !Map private port 5044 to public port 5044
-Router(config)# ip nat inside static source tcp [PRIVATE-IP] 5044 [PUBLIC-IP] 5044
+Router(config)# ip nat inside source static tcp [PRIVATE-IP] 5044 [PUBLIC-IP] 5044
 
 !in case of one port linked to Outside-Interface:
 Router(config)# ip nat inside source static tcp [PRIVATE-IP] [PRIVATE-PORT] interface GigabitEthernet0/0 [PUBLIC-PORT]
