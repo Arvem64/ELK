@@ -49,7 +49,7 @@ discovery.seed_hosts: #(a string containing the addresses separated by commas, t
 - 10.0.0.12
 - 10.0.0.13
 
-systemctl restart elasticsearch
+systemctl enable --now elasticsearch
 
 *********************************************
 Set Built-in Users Password:
@@ -58,23 +58,10 @@ cd /usr/share/elasticsearch/bin
 
 #for the user= elastic
 
-***********************************************************************
-Configure Logstash Authentication
+#***********************************************************************
+#Configure Filebeat Authentication
 
-Update the logstash's configuration file /etc/logstash/conf.d/logstash.conf
-
-Add 2 lines on the Elasticsearch's Output plugging:
-user =>'elastic'
-password =>'password'
-systemctl restart logstash
-
-#use the password you keyed-in in the previous steps
-#in our case is cfglog.conf as mentioned in the handbook
-
-*********************************************************
-Configure Filebeat Authentication
-
-Update /etc/filebeat/filebeat.yml
+vi /etc/filebeat/filebeat.yml
 
 #since - type: log is deprecated, we now use Filestream input block instead:
 ---------------------------------------------
@@ -136,49 +123,240 @@ hosts: ["elk-srv:5044"]
 
 #in case of one way TLS (a self-signed certificate issued by Elastic Server, which acts as a certificate authority (CA)). Keep this certificate where the Issuer and SubjectName "/CN" are indentical-namely, "elk-srv":
 #ssl.certificate_authorities: ["/etc/pki/tls/certs/logstash-forwarder.crt"]
-====================================================================================
-------------------------------------------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------------------------------------------
-#in case of configuring filebeat to send data straight to elasticsearch, bypassing logstash:
+#===================================================================================
+#-----------------------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------------
+#in case of only configuring filebeat to send data straight to elasticsearch, bypassing logstash:
 
 output.elasticsearch:
-      hosts: ["localhost:9200"]
-      protocol: "https"
-      #Authentication credentials
-      username: "elastic"
-      password: "elasticpsswrd"
 
-systemctl restart filebeat
-#use the password you keyed-in in the previous steps
+      #in case of exclusively specifying one host:
+      #hosts: ["https://elk-srv:9200"]
 
-*************************************************************************************
-Configure Kibana Authentication
+      hosts: 
+       
+       #adding a hostname and its corresponding IP@ works (hostnames must be resolved)
+        - "https://elk-srv:9200"
+        - "https://es_node1.internal.company.com:9200"
+        - "https://10.0.0.11:9200"
+        - "https://10.0.0.12:9200"
+        - "https://10.0.0.13:9200"
 
-Update /etc/kibana/kibana.yml
+      #Authentication credentials:: filebeat authenticates using its elasticsearch user and password (elasticsearch cert and private key possession are automatically verified during the handshake)
+      #!role must be defined on the kibana API
+      username: "filebeat_writer"
+
+      #${FE_PASSWORD} = get the string value of the [FE_PASSWORD] password's placeholder
+      password: "${FE_PASSWORD}"
+
+      #filebeat trusts this issuing CA (it checks the signature chain against the CA cert and that SAN matches one of the hosts listed above)
+      #sudo ln -s "/etc/elasticsearch/certs/http_ca.crt /etc/filebeat/certs/http_ca.crt
+      ssl.certificate_authorities:
+        - "/etc/filebeat/certs/http_ca.crt"
+
+#==========================================================================
+##Bash
+
+#sudo filebeat keystore create
+#sudo filebeat keystore add FE_PASSWORD
+#sudo filebeat keystore list
+
+#check http_ca cert's content
+#sudo openssl x509 -in /etc/elasticsearch/certs/http_ca.crt -noout -subject -issuer -dates -fingerprint -sha256
+#==========================================================================
+
+systemctl enable --now filebeat
+
+#--------------------------------------------------------------------------
+POST _security/role/filebeat_writer
+
+{
+  "cluster": ["monitor"], 
+  "indices": [
+    {
+      "names": ["filebeat-*"], 
+      "privileges": ["auto_configure","create_doc"]  
+    }
+  ]
+}
+
+#monitor = allow monitoring cluster-level information: check whether elasticsearch is healthy and responding, such as whether the cluster is available to receive log events
+#auto_configure = allow automatic creation or config of target index or data stream in supported circumstances
+#create_doc = allow creating new documents without updating existing documents
+
+#-------------------------------------------------------------------------
+POST _security/user/filebeat_internal
+
+{
+  "password" : "FE-pack-test-password",
+  "roles" : ["filebeat_writer"],
+  "full_name" : "Internal Filebeat User"
+}
+
+#--------------------------------------------------------------------------
+#for the monitoring role, elasticsearch may return (in JSON format):
+
+{
+   "status": "green",
+   "number_of_nodes": 3,
+   "active_shards": 10
+}
+
+#check destinations in kibana dev tools:
+GET _cat/indices?v
+GET _cat/data_streams?v
+
+#v = verbose mode:: it adds column header to the output so we could understand what each value represents
+
+#************************************************************************************
+#Configuring Kibana
+
+vi /etc/kibana/kibana.yml
 
 server.port: 5601
-server.host: "localhost" #(LAN IP@ or 0.0.0.0)
-elasticsearch.hosts: ["https://localhost:9200"]
-server.name: "kibana"
-elasticsearch.username: "kibana_system"
-elasticsearch.password: "password"
+server.host: "localhost" #(LAN IP@ or 0.0.0.0 => check SAN's cert and add the appropriate firewall's rule depending on the IP@)
 
-#Elasticsearch's automatic security setup generates the HTTP CA when it starts for the first time, so copy it to the kibana's certs folder: sudo cp /etc/elasticsearch/certs/http_ca.crt /etc/kibana/certs/
+#optional: kibana instance's name, default=hostname
+server.name: "kibana"
+
+#########kibana + elasticsearch :: https + http basic authentication########
+#https (kibana checks the trusted elastic CA cert to authenticate elasticsearch) + http basic authentication (kibana sends its credentials over TLS)
+elasticsearch.hosts: ["https://localhost:9200"]
+
+#Elasticsearch's automatic security setup generates the HTTP CA when it starts for the first time, file located at:
+#chown root:kibana /etc/elasticsearch/certs/http_ca.crt
+#chmod chmod 640 /etc/elasticsearch/certs/http_ca.crt
+#sudo ln -s /etc/elasticsearch/certs/http_ca.crt /etc/kibana/certs/
+#kibana uses this CA to verify the elasticsearch's identity 
+
 elasticsearch.ssl_certificateAuthorities: ["/etc/kibana/certs/http_ca.crt"]
+
+#kibana sends its credentials to elasticsearch over TLS instead of presenting a client certificate
+#"kibana_system" account is intended for kibana's internal communication with elasticsearch, it should not be used by human users to log into kibana interface (it's the elasticsearch built-in user)
+elasticsearch.username: "kibana_system"
+
+#!password in plaintext => kibana-keystore is recommended in storing secrets or keypassphrases
+#elasticsearch.password: "PLAINTEXT_PASSWORD"
+#======================================================================================
+##Bash
+
+###run this
+#start by adding a password of the built-in kibana_system account to elasticsearch(this later verifies passwords' hashes, not plaintext passwords) 
+sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u kibana_system -i
+
+#store that same password (which is elasticsearch.password) in Kibana's keystore rather than writing it in plaintext in kibana.yml
+##create the keystore if it does not exist
+sudo /usr/share/kibana/bin/kibana-keystore create
+
+##type that password again when prompting
+sudo /usr/share/kibana/bin/kibana-keystore add elasticsearch.password
+
+#the kibana's keystore is located at: /etc/kibana/kibana.keystore
+#kibana reads the password when it starts and uses it when connecting to elasticsearch
+
+#verify if the keystore entry exists
+#sudo /usr/share/kibana/bin/kibana-keystore list
+
+##note that each of elasticsearch, logstash and kibana have their own separate keystore, located at:
+##/etc/elasticsearch/elasticsearch.keystore
+##/etc/kibana/kibana.keystore
+##/etc/logstash/logstash.keystore
+
+#show the http_ca cert's content in a readable human text and skipping the encoded part
+#sudo openssl x509 -in /etc/kibana/http_ca.cert -text -noout
+
+------------------------------------------------------------
+###useful commands to run before setting permissions:
+
+##check a linux user and its groups: id [USER]
+#id kibana
+#stdout: uid=991(kibana) gid=992(kibana) groups=992(kibana)
+
+#check user information
+##!passwd DB not the cmd
+#getent passwd kibana
+
+#stdout: kibana:x:991:992:kibana server:/var/lib/kibana:/sbin/nlogin
+###kibana = user name ==> local linux users information stored in /etc/passwd file
+###x = user's password placeholder ==> passwords' hashes are stored in /etc/shadow file
+###991 = UID
+###992 = GID
+###kibana server = description
+###/var/lib/kibana = kibana's data directory
+###/sbin/nologin = prevent the user "kibana" from starting a normal interactive login session through SSH or a terminal (it's only intended for running "kibana" service ===> the same for "elasticsearch" and "logstash") 
+
+##check which group a user belongs to: getent [DATABASE] key:: getent = get an entry from a DB using the keyword "key"
+#getent group kibana
+
+#stdout: kibana:x:992:
+###kibana = group name
+###x = group's password placeholder
+###992 = group ID(GID)
+###members = notice that after the last (:) no users listed, means only the linux user "kibana" belongs to that linux group "kibana", otherwise, we would have had (:user1,user2) --- the same for elasticsearch and logstash
+#======================================================================================
+
+######### kibana + elasticsearch :: mTLS ########
+
+#in case of mTLS:: comment the elasticsearch.username line, skip the 1st Bash part and add the following:
+
+##keep in mind that it's the client authentication (kibana), not the server auth (elasticsearch)
+##elasticsearch verifies the client cert against its trusted CA (is the entity who signed the client cert is an elasticsearch's trusted CA? so, the SAN=DNS:localhost is not required for the client authentication (extendedKeyUsage = clientAuth), the identity could be established from its subject (CN = kibana_system) and the role mapping could be configured in elasticsearch's pki realm (elasticsearch maps the authenticated user to its role like "kibana_system role"))
+
+#enable SSL: nginx => kibana:: https://localhost:5601
+server.ssl.enabled:true
+
+#use the http_ca or a self-signed cert
+#alternative:: create another certificate "Issuer and Subject = Elastic-Internal_CA"  
+elasticsearch.ssl_certificateAuthorities: ["/etc/kibana/certs/http_ca.crt"]
+
+elasticsearch.ssl.certificate: /etc/kibana/certs/kibana_elasticseach.crt
+elasticsearch.ssl.key: /etc/kibana/certs/kibana_elasticseach.key
+
+#kibana is configured to accept one canonical URL, however, with the "server_name elk-srv es_node1.internal.company.com" nginx's line => both work 
+server.publicBaseUrl: "https://es_node1.internal.company.com"
 
 logging.root.level: info #(which type of logs to display. Minimum log level. One of debug, info, warning, or error. The default log level is info)
 
-systemctl restart kibana
+systemct daemon-reload
+systemctl enable --now kibana
+
+systemctl status kibana
+#----------------------------
+#check binary log file (/var/log/journal/ or /run/log/journal) by querying journald 
+sudo journalctl -u kibana -f
+
+#read plaintext log file (-f: follows == streaming live logs)
+#sudo tail -f /var/log/kibana/kibana.log
+
+//////////////////////////////////////////////////////////////////////////////////
+##-------------------------------------------------------------------------------
+####alternative method to create its own http_ca cert:
 
 #Otherwise, run /usr/share/elasticsearch/bin/elasticsearch-certutil http
 #be sure you select N to "Generate a CSR" (Certificate signing request to be sent to a trusted external or internal CA for signing) to generate a CRT instead, and Y to "using an existing CA" if you already created a CA for your cluster, when prompting
 #it's recommended by Elastic to use the existing HTTP_CA certificate
+##-------------------------------------------------------------------------------
+##-------------------------------------------------------------------------------
+#Info:
+##kibana_system's role allows communication with elasticsearch for its internal operations in it such:
+#save and retrieve kibana settings
+#manage dashboards and visualisations stored in elasticsearch
+#access kibana's internal indices...
 
-*******************************************************************************
-*******************************************************************************
-Configuring Nginx over SSL:
+##check the elasticsearch built-in user "kibana_system":
+#go to kibana portal (https://es_node1.internal.company.com or https://elk-srv)=> Dev Tools => Console => enter the http request => run:
 
-Update /etc/nginx/conf.d/elk-srv.conf
+GET /_security/user/kibana_system
+
+#output: receiving JSON describing this user, its roles and whether it is enabled
+
+#/////////////////////////////////////////////////////////////////////////////////
+
+#*******************************************************************************
+#*******************************************************************************
+#Configuring Nginx over SSL:
+
+vi /etc/nginx/conf.d/elk-srv.conf
 
 server {
 
