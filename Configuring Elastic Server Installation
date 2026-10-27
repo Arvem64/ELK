@@ -345,69 +345,229 @@ server {
 #$host = hostname requested by the client
 #$request_uri = request path:: e.g. /app
 
------------------------------------------------------------------
-other method:
------------------------------------------------------------------------
-On the role API feature, create a logstash_writer role (or via Kibana UI):
+#--------------------------------------------------------------------------
+#**************************************************************************
+#**************************************************************************
+#**************************************************************************
+###Configuring Logstash
+
+#conf.d = logstash pipeline files
+
+vi /etc/logstash/conf.d/logstash.conf
+
+input {
+   
+
+}
+
+filter {
+ 
+}
+
+output {
+  elasticsearch {
+  
+    #######logstash + elasticsearch:: HTTPS +  http basic authentication#######
+
+    hosts => ["https://elk-srv:9200"]
+    
+    #in case of multiple nodes (hostnames and their own IPs or aliases are allowed)
+    #each endpoint must pass TLS certificate verification
+    #hosts => ["https://elk-srv:9200", "https://es_node1.internal.company.com:9200", "https://10.0.0.11:9200", "https://10.0.0.12:9200", "https://10.0.0.13:9200"]
+    
+    #enable HTTPS: "https://elk-srv:9200":: logstash sends parsed docs (events) to elasticsearch over HTTPS
+    ssl_enabled => true
+    #logstash trusts that issuing CA
+    ssl_certificate_authorities => ["/etc/logstash/certs/Elastic-Internal_CA.crt"]
+    
+    #create a daily index based on the log-shipper agent's name == "filebeat-version-date" 
+    ##use the "index" option, if "ilm_enabled => false"
+    ##each day an index will be created: e.g. "filebeat-9.5.5-2026.10.06"
+    #index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+ 
+    #the elasticsearch account "logstash" uses to log in
+    user => "logstash_internal"
+    #logstash retrieves the password from its keystore variable LE_PASSWORD
+    password => ${LE_PASSWORD}
+
+    #####recommended: in case of using ILM (Index Lifecycle Management) to automatically manage indices through phases such as hot, warm, cold, frozen and delete:
+    #enable ILM with its default setup (no custom index_template created) 
+    ilm_enabled => true
+
+    #-------------------------------------------------------------
+    ###in case of using a custom ILM settings:: add the following:
+    ##index template: set of rules elasticsearch automatically applies when creating a new index 
+    
+    #specify the alias logstash uses to write docs to
+    ##backing-name names must match the role's index pattern
+    ##rollover alias must be configured in the index template
+    ##alias must be configured in the index template and ILM policy setup
+    ilm_rollover_alias => "logstash"
+    
+    #start the backing-index (rollover_alias-pattern) naming sequences at "logstash-000001"
+    #logstash requests elasticsearch to create "logstash-000001" => ES checks logstash's create_index permission (_security/role/ privileges) => if authorized::ES creates the index 
+    #indices: write docs to logstash-000001 until ILM policy is reached, then swipe to logstash-000002 (rollover) and so on
+    ilm_pattern => "000001"
+
+    #specify the ILM policy name
+    ilm_policy => "logs-30-days"
+
+    #prevent logstash from managing the index_template given that we use a custom one
+    manage_template => false
+    #------------------------------
+  }
+}
+
+#DLQ = dead letter queue, where logstash can put events that fail processing or indexing under configured conditions
+
+#===================================================================
+##Bash
+
+sudo -u logstash /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash create 
+
+sudo -u logstash /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash add LE_PASSWORD
+
+sudo -u logstash /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash list
+
+#logstash keystore where passwords are stored = /etc/logstash/logstash.keystore
+##-u logstash (user created when installing the Logstash RPM): run the cmd as the linux user "logstash" and not as root like in case of "elasticsearch" and "kibana", their keystores are managed as root, the same for "sudo filebeat"
+##--path.settings /etc/logstash: tells logstash keystore cmd where to find the config and keystore
+
+#=======================================================================
+
+#///////////////////////////////////////////////////////////////////////
+######### Kibana API
+
+#Kibana => Dev Tools:
+
+##Creating a logstash role and user and assigning that role to that user
+
+#----------------------------------------------------------------------
+#on the role API feature, create the logstash_writer role (or via Kibana UI):
+
+ ##"names": [ "logstash-*" ] == authorize logstash to access matching indices
 
 POST _security/role/logstash_writer
 {
   "cluster": ["manage_index_templates", "monitor", "manage_ilm"], 
   "indices": [
     {
-      "names": [ "logstash-*" ], 
+      "names": ["logstash-*"],
       "privileges": ["write","create","create_index","manage","manage_ilm"]  
     }
   ]
 }
 
-#in our case, we have 2 indices logstash-* and zabbix-*, so we modify this line:
-#!"names": [ "logstash-*" , "zabbix-*" ], 
------------------------------------------------------------------------
-Create a logstash_internal user and assign it the logstash_writer role:
+#-------------------------------------------------------------------------
+#create the logstash_internal user and assign the logstash_writer role to it
 
 POST _security/user/logstash_internal
 {
+  #password in plaintext, so we use HTTPS to protect it while it travels to Elasticsearch
+  #elasticsearch stores it as a secure hash
+
   "password" : "x-pack-test-password",
-  "roles" : [ "logstash_writer"],
+  "roles" : ["logstash_writer"],
   "full_name" : "Internal Logstash User"
 }
 
---------------------------------------------------------------------------------------------------
-Configure Logstash to authenticate as the logstash_internal user and enabling TLS/SSL Encryption:
+#--------------------------------------------------------------------------
+#--------------------------------------------------------------------------
+########### Creating a custom index_template ######################
 
-input {
-  elasticsearch {
-    ...
-    user => logstash_internal
-    password => x-pack-test-password
-  }
+###alias must be configured in the index template and ILM setup:
+
+#step 1- create the ILM policy to roll over an index
+#------------------------------------------------------------------------- 
+PUT _ilm/policy/logs-30-days
+
+{
+  "policy": {
+     "phases": {
+
+         "hot": {
+           "actions": {
+             "rollover": {
+                "max_primary_shard_size": "50gb",
+                "max_age": "30d"
+               }
+            }
+         },
+ 
+        "delete": {
+          "min_age": "30d",
+          "actions": {
+            "delete": {}
+          }
+        }
+      }
+    }
+ }
+
+#apply "policy" in these 2 phases "hot" and "delete":
+##in the "hot" phase (logs are actively written and frequently accessed): apply "rollover" "actions"
+###rollover switches writes to a new backing index when a configured condition is reached
+##in the "delete" phase (logs are deleted when their retention period expires): check "min_age" and apply "delete" "actions"
+###delete removes old indices according to the retention policy
+#shard: a part of an elasticsearch index where docs are stored
+#-------------------------------------------------------------------------
+#step 2- create the index template
+
+PUT _index_template/logstash_template
+{
+  #apply the template to matching indices
+  ##logstash-* here is a pattern not an actual index, it matches indices whose names start with logstash-, such as logstash-000001 and logstash-000002
+  "index_patterns" : ["logstash-*"],
+
+  "template": {
+     "settings": {
+         
+         #select ILM policy
+         "index.lifecycle.name": "logs-30-days",
+
+         #tells ILM which alias to roll over
+         "index.lifecycle.rollover_alias": "logstash"
+      }
+   },
+   
+  "priority" : 200
 }
-filter {
-  elasticsearch {
-    ...
-    user => logstash_internal
-    password => x-pack-test-password
 
-  }
+#"priority" : 200 = determine which index template elasticsearch chooses when multiple templates match the same index
+##if two index templates can match the same index because their patterns overlap:
+  #template A = "index_patterns" : ["logstash-*"] => "priority": 200
+  #template B = "index_patterns" : ["logstash-000*"] => "priority": 100
+##both match logstash-000001 => given priority => select A
+
+#/////////////////////////////////////////////////////////////
+#when logstash-000002 is created after rollover, elasticsearch can apply the matching template settings automatically:
+
+###which indices: logstash-*
+###which ILM policy: logs-30-days
+###which rollover alias: logstash
+#-------------------------------------------------------------------------
+#step 3- create the first backing index
+
+#create the 1st index and attach the alias as its write alias
+ 
+PUT logstash-000001
+{
+  "aliases": {
+     "logstash":{
+        "is_write_index": true
+     }
+   }
 }
-output {
-  elasticsearch {
-    ...
-    user => logstash_internal
-    password => x-pack-test-password
-    ssl_enabled => true
-    ssl_certificate_authorities => '/path/to/cert.pem'
-  }
-}
+#--------------------------------------------------------------------------
+#*****************************************************************************************
+#*****************************************************************************************
+#*****************************************************************************************
+#*****************************************************************************************
+#*****************************************************************************************
+##################### Certificates Generation ############################################
+#Creation of certificates for use with Transport Layer Security (TLS) in the Elastic Stack:
 
-#in our case: /etc/pki/tls/certs/logstash-forwarder.crt
-
---------------------------------------------------------------------
---------------------------------------------------------------------
-Creation of certificates for use with Transport Layer Security (TLS) in the Elastic Stack:
-
-Generating a new certificate authority (CA) in PEM format (unencrypted private key):
+#Generating a new certificate authority (CA) in PEM format (unencrypted private key):
 
 cd /usr/share/elasticsearch/bin
 ./bin/elasticsearch-certutil ca --out /etc/pki/tls/certs/elastic-ca.zip --pem
