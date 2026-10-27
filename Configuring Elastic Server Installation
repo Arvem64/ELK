@@ -361,18 +361,20 @@ vi /etc/nginx/conf.d/elk-srv.conf
 server {
 
      #Configure SSL on port 443:
-     listen 443 ssl;
+     #listen 443 ssl;
 
      #Configure SSL on a specific address [Private-IP@]:443 :: this guarantees Nginx completely ignores requests coming from WAN interface
-     #listen 10.0.0.13:443 ssl;
+     listen 10.0.0.11:443 ssl;
 
-     #users access https://elk-srv
-     server_name elk-srv;
+     #users access https://elk-srv or internal subdomain FQND:: https://es_node1.internal.company.com
 
-     #the public cert that Nginx presents to the browser (LAN Client) -- if users access https://elk-srv then, the cert should have SAN=DNS:elk-srv:
-     ssl_certificate  /etc/nginx/certs/nginx_identity.crt;
+     server elk-srv, es_node1.internal.company.com;
 
-     #the private key is to keep on the server:
+     #the public cert that Nginx presents to the browser (LAN Client) -- if users access https://elk-srv or es_node1.internal.company.com then, the cert should contain SAN=DNS:elk-srv and es_node1.internal.company.com:
+     #!create symbolic links to the certificates and keys
+     ssl_certificate /etc/nginx/certs/nginx_identity.crt;
+
+     #the private key is permanently stored within the server:
      ssl_certificate_key /etc/nginx/certs/nginx_identity.key;
 
      #recommended: passphrase stored in plaintext to the tmpfs file, to decrypt the encrypted private key:
